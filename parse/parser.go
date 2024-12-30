@@ -8,7 +8,7 @@ import __yyfmt__ "fmt"
 //line parser.go.y:2
 
 import (
-	"MilkLua/ast"
+	"github.com/zmsvDreamLang/Milk/ast"
 )
 
 //line parser.go.y:34

@@ -38,13 +38,13 @@ func init() {
 		homeDir = os.Getenv("HOME")
 		MilkDir = filepath.Join(homeDir, ".milklib")
 		LuaDirSep = "/"
-		LuaPathDefault = "./?.lua;" + LuaLDir + "/?.lua;" + LuaLDir + "/?/init.lua;" + MilkDir + "/?.lua;" + MilkDir + "/?/init.lua;" + MilkDir + "/?.milk;" + MilkDir + "/?/init.milk"
+		LuaPathDefault = "./?.lua;" + LuaLDir + "/?.lua;" + LuaLDir + "/?.so;" + LuaLDir + "/?/init.lua;" + MilkDir + "/?.lua;" + MilkDir + "/?/init.lua;" + MilkDir + "/?.milk;" + MilkDir + "/?/init.milk"
 	} else { // windows
 		LuaOS = "windows"
 		LuaLDir = "!\\lua"
 		homeDir = os.Getenv("USERPROFILE")
 		MilkDir = filepath.Join(homeDir, ".milklib")
 		LuaDirSep = "\\"
-		LuaPathDefault = ".\\?.lua;" + LuaLDir + "\\?.lua;" + LuaLDir + "\\?\\init.lua;" + MilkDir + "\\?.lua;" + MilkDir + "\\?\\init.lua;" + MilkDir + "\\?.milk;" + MilkDir + "\\?\\init.milk"
+		LuaPathDefault = ".\\?.lua;" + LuaLDir + "\\?.lua;" + LuaLDir + "\\?.so;" + LuaLDir + "\\?\\init.lua;" + MilkDir + "\\?.lua;" + MilkDir + "\\?\\init.lua;" + MilkDir + "\\?.milk;" + MilkDir + "\\?\\init.milk"
 	}
 }

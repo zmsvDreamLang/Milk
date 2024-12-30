@@ -1,0 +1,16 @@
+ffi.godef([[
+package main
+
+func main() {
+    x = 10
+    y = 5
+    println("x =", x)
+    println("y =", y)
+    println("x + y =", x + y)
+    println("x - y =", x - y)
+    println("x * y =", x * y)
+    println("x / y =", x / y)
+}
+]])
+local res = ffi.goexec()
+print("算术运算测试结果:\n" .. res)

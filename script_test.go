@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"MilkLua/parse"
+	"github.com/zmsvDreamLang/Milk/parse"
 )
 
 const maxMemory = 40

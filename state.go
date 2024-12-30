@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"MilkLua/parse"
+	"github.com/zmsvDreamLang/Milk/parse"
 )
 
 const MultRet = -1

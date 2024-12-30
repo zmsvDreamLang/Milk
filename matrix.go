@@ -57,25 +57,56 @@ func matrixAdd(L *LState) int {
 		return 0
 	}
 
+	if matrix1.Len() == 0 || matrix2.Len() == 0 {
+		L.RaiseError("One of the input matrices is empty")
+		return 0
+	}
+
 	result := L.NewTable()
 	m1Rows := matrix1.Len()
 
 	isMatrix2Vector := matrix2.RawGetInt(1).Type() != LTTable
 
 	for i := 1; i <= m1Rows; i++ {
-		row1 := matrix1.RawGetInt(i).(*LTable)
+		row1 := matrix1.RawGetInt(i)
+		if row1.Type() != LTTable {
+			L.RaiseError("Invalid type in matrix1 at row %d", i)
+			return 0
+		}
+		row1Table := row1.(*LTable)
 		resultRow := L.NewTable()
 
-		for j := 1; j <= row1.Len(); j++ {
-			var value2 LNumber
-			if isMatrix2Vector {
-				value2 = matrix2.RawGetInt(j).(LNumber)
-			} else {
-				row2 := matrix2.RawGetInt((i-1)%matrix2.Len() + 1).(*LTable)
-				value2 = row2.RawGetInt(j).(LNumber)
+		for j := 1; j <= row1Table.Len(); j++ {
+			value1 := row1Table.RawGetInt(j)
+			if value1.Type() != LTNumber {
+				L.RaiseError("Invalid type in matrix1 at position [%d][%d]", i, j)
+				return 0
 			}
 
-			sum := LNumber(row1.RawGetInt(j).(LNumber) + value2)
+			var value2 LNumber
+			if isMatrix2Vector {
+				value2Raw := matrix2.RawGetInt(j)
+				if value2Raw.Type() != LTNumber {
+					L.RaiseError("Invalid type in matrix2 at position [%d]", j)
+					return 0
+				}
+				value2 = value2Raw.(LNumber)
+			} else {
+				row2 := matrix2.RawGetInt((i-1)%matrix2.Len() + 1)
+				if row2.Type() != LTTable {
+					L.RaiseError("Invalid type in matrix2 at row %d", (i-1)%matrix2.Len()+1)
+					return 0
+				}
+				row2Table := row2.(*LTable)
+				value2Raw := row2Table.RawGetInt(j)
+				if value2Raw.Type() != LTNumber {
+					L.RaiseError("Invalid type in matrix2 at position [%d][%d]", (i-1)%matrix2.Len()+1, j)
+					return 0
+				}
+				value2 = value2Raw.(LNumber)
+			}
+
+			sum := LNumber(float64(value1.(LNumber)) + float64(value2))
 			resultRow.RawSetInt(j, sum)
 		}
 		result.RawSetInt(i, resultRow)
@@ -94,18 +125,37 @@ func matrixAddBias(L *LState) int {
 		return 0
 	}
 
+	if matrix.Len() == 0 || bias.Len() == 0 {
+		L.RaiseError("Matrix or bias vector is empty")
+		return 0
+	}
+
 	result := L.NewTable()
 	mRows := matrix.Len()
 
 	for i := 1; i <= mRows; i++ {
-		row := matrix.RawGetInt(i).(*LTable)
+		row := matrix.RawGetInt(i)
+		if row.Type() != LTTable {
+			L.RaiseError("Invalid type in matrix at row %d", i)
+			return 0
+		}
+		rowTable := row.(*LTable)
 		resultRow := L.NewTable()
 
-		for j := 1; j <= row.Len(); j++ {
-			matrixValue := row.RawGetInt(j).(LNumber)
-			biasValue := bias.RawGetInt(j).(LNumber)
+		for j := 1; j <= rowTable.Len(); j++ {
+			matrixValue := rowTable.RawGetInt(j)
+			if matrixValue.Type() != LTNumber {
+				L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+				return 0
+			}
 
-			sum := LNumber(float64(matrixValue) + float64(biasValue))
+			biasValue := bias.RawGetInt(j)
+			if biasValue.Type() != LTNumber {
+				L.RaiseError("Invalid type in bias vector at position [%d]", j)
+				return 0
+			}
+
+			sum := LNumber(float64(matrixValue.(LNumber)) + float64(biasValue.(LNumber)))
 			resultRow.RawSetInt(j, sum)
 		}
 		result.RawSetInt(i, resultRow)
@@ -124,15 +174,25 @@ func matrixApply(L *LState) int {
 		return 0
 	}
 
+	if matrix.Len() == 0 {
+		L.RaiseError("Input matrix is empty")
+		return 0
+	}
+
 	result := L.NewTable()
 
 	for i := 1; i <= matrix.Len(); i++ {
-		row := matrix.RawGetInt(i).(*LTable)
+		row := matrix.RawGetInt(i)
+		if row.Type() != LTTable {
+			L.RaiseError("Invalid type in matrix at row %d", i)
+			return 0
+		}
+		rowTable := row.(*LTable)
 		resultRow := L.NewTable()
 
-		for j := 1; j <= row.Len(); j++ {
+		for j := 1; j <= rowTable.Len(); j++ {
 			L.Push(fn)
-			L.Push(row.RawGetInt(j))
+			L.Push(rowTable.RawGetInt(j))
 			L.Call(1, 1)
 			resultRow.RawSetInt(j, L.Get(-1))
 			L.Pop(1)
@@ -148,16 +208,22 @@ func matrixApply(L *LState) int {
 func matrixSub(L *LState) int {
 	a := L.CheckAny(1)
 	b := L.CheckAny(2)
+	name := L.OptString(3, "matrix")
 
 	switch av := a.(type) {
 	case *LTable:
 		switch bv := b.(type) {
 		case *LTable:
+			if av.Len() != bv.Len() {
+				L.RaiseError("Error updating %s: matrix dimensions do not match for subtraction", name)
+				return 0
+			}
 			return subtractTables(L, av, bv)
 		case LNumber:
 			return subtractTableNumber(L, av, bv)
 		default:
-			L.RaiseError("Unsupported type for subtraction: %T and %T", a, b)
+			L.RaiseError("Error updating %s: unsupported type for subtraction: %T and %T", name, a, b)
+			return 0
 		}
 	case LNumber:
 		switch bv := b.(type) {
@@ -167,13 +233,13 @@ func matrixSub(L *LState) int {
 			L.Push(LNumber(float64(av) - float64(bv)))
 			return 1
 		default:
-			L.RaiseError("Unsupported type for subtraction: %T and %T", a, b)
+			L.RaiseError("Error updating %s: unsupported type for subtraction: %T and %T", name, a, b)
+			return 0
 		}
 	default:
-		L.RaiseError("Unsupported type for subtraction: %T", a)
+		L.RaiseError("Error updating %s: unsupported type for subtraction: %T", name, a)
+		return 0
 	}
-
-	return 0
 }
 
 func subtractTables(L *LState, a, b *LTable) int {
@@ -197,9 +263,13 @@ func subtractTables(L *LState, a, b *LTable) int {
 				}
 				resultRow := L.NewTable()
 				for j := 1; j <= ar.Len(); j++ {
-					aVal := ar.RawGetInt(j).(LNumber)
-					bVal := br.RawGetInt(j).(LNumber)
-					resultRow.RawSetInt(j, LNumber(float64(aVal)-float64(bVal)))
+					aVal := ar.RawGetInt(j)
+					bVal := br.RawGetInt(j)
+					if aVal.Type() != LTNumber || bVal.Type() != LTNumber {
+						L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+						return 0
+					}
+					resultRow.RawSetInt(j, LNumber(float64(aVal.(LNumber))-float64(bVal.(LNumber))))
 				}
 				result.RawSetInt(i, resultRow)
 			default:
@@ -223,7 +293,6 @@ func subtractTables(L *LState, a, b *LTable) int {
 	L.Push(result)
 	return 1
 }
-
 func subtractTableNumber(L *LState, table *LTable, number LNumber) int {
 	result := L.NewTable()
 	for i := 1; i <= table.Len(); i++ {
@@ -232,7 +301,11 @@ func subtractTableNumber(L *LState, table *LTable, number LNumber) int {
 		case *LTable:
 			resultRow := L.NewTable()
 			for j := 1; j <= r.Len(); j++ {
-				val := r.RawGetInt(j).(LNumber)
+				val, ok := r.RawGetInt(j).(LNumber)
+				if !ok {
+					L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+					return 0
+				}
 				resultRow.RawSetInt(j, LNumber(float64(val)-float64(number)))
 			}
 			result.RawSetInt(i, resultRow)
@@ -255,7 +328,11 @@ func subtractNumberTable(L *LState, number LNumber, table *LTable) int {
 		case *LTable:
 			resultRow := L.NewTable()
 			for j := 1; j <= r.Len(); j++ {
-				val := r.RawGetInt(j).(LNumber)
+				val, ok := r.RawGetInt(j).(LNumber)
+				if !ok {
+					L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+					return 0
+				}
 				resultRow.RawSetInt(j, LNumber(float64(number)-float64(val)))
 			}
 			result.RawSetInt(i, resultRow)
@@ -300,7 +377,12 @@ func matrixSum(L *LState) int {
 		for i := 1; i <= rows; i++ {
 			row := matrix.RawGetInt(i).(*LTable)
 			for j := 1; j <= cols; j++ {
-				sum += row.RawGetInt(j).(LNumber)
+				val, ok := row.RawGetInt(j).(LNumber)
+				if !ok {
+					L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+					return 0
+				}
+				sum += val
 			}
 		}
 		result.RawSetInt(1, L.NewTable())
@@ -311,7 +393,12 @@ func matrixSum(L *LState) int {
 			colSum := LNumber(0)
 			for i := 1; i <= rows; i++ {
 				row := matrix.RawGetInt(i).(*LTable)
-				colSum += row.RawGetInt(j).(LNumber)
+				val, ok := row.RawGetInt(j).(LNumber)
+				if !ok {
+					L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+					return 0
+				}
+				colSum += val
 			}
 			result.RawSetInt(j, colSum)
 		}
@@ -346,7 +433,13 @@ func matrixHadamard(L *LState) int {
 		row2 := matrix2.RawGetInt(i).(*LTable)
 		resultRow := L.NewTable()
 		for j := 1; j <= cols1; j++ {
-			value := LNumber(row1.RawGetInt(j).(LNumber) * row2.RawGetInt(j).(LNumber))
+			val1, ok1 := row1.RawGetInt(j).(LNumber)
+			val2, ok2 := row2.RawGetInt(j).(LNumber)
+			if !ok1 || !ok2 {
+				L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+				return 0
+			}
+			value := LNumber(val1 * val2)
 			resultRow.RawSetInt(j, value)
 		}
 		result.RawSetInt(i, resultRow)
@@ -381,9 +474,13 @@ func matrixMul(L *LState) int {
 		for j := 1; j <= cols2; j++ {
 			sum := LNumber(0)
 			for k := 1; k <= cols1; k++ {
-				a := matrix1.RawGetInt(i).(*LTable).RawGetInt(k).(LNumber)
-				b := matrix2.RawGetInt(k).(*LTable).RawGetInt(j).(LNumber)
-				sum += a * b
+				val1, ok1 := matrix1.RawGetInt(i).(*LTable).RawGetInt(k).(LNumber)
+				val2, ok2 := matrix2.RawGetInt(k).(*LTable).RawGetInt(j).(LNumber)
+				if !ok1 || !ok2 {
+					L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+					return 0
+				}
+				sum += val1 * val2
 			}
 			resultRow.RawSetInt(j, sum)
 		}
@@ -393,28 +490,61 @@ func matrixMul(L *LState) int {
 	L.Push(result)
 	return 1
 }
-
 func matrixDiv(L *LState) int {
 	matrix1 := L.CheckTable(1)
 	matrix2 := L.CheckTable(2)
 
+	if matrix1 == nil || matrix2 == nil {
+		L.RaiseError("One of the input matrices is nil")
+		return 0
+	}
+
+	if matrix1.Len() == 0 || matrix2.Len() == 0 {
+		L.RaiseError("One of the input matrices is empty")
+		return 0
+	}
+
+	if matrix1.Len() != matrix2.Len() {
+		L.RaiseError("Matrix dimensions do not match")
+		return 0
+	}
+
 	result := L.NewTable()
 
 	for i := 1; i <= matrix1.Len(); i++ {
-		row1 := matrix1.RawGetInt(i).(*LTable)
-		row2 := matrix2.RawGetInt(i).(*LTable)
+		row1 := matrix1.RawGetInt(i)
+		row2 := matrix2.RawGetInt(i)
 
-		if row1.Len() != row2.Len() {
-			L.RaiseError("Matrix dimensions do not match")
+		if row1.Type() != LTTable || row2.Type() != LTTable {
+			L.RaiseError("Invalid type in matrices at row %d", i)
+			return 0
+		}
+
+		row1Table := row1.(*LTable)
+		row2Table := row2.(*LTable)
+
+		if row1Table.Len() != row2Table.Len() {
+			L.RaiseError("Matrix dimensions do not match at row %d", i)
+			return 0
 		}
 
 		resultRow := L.NewTable()
-		for j := 1; j <= row1.Len(); j++ {
-			divisor := row2.RawGetInt(j).(LNumber)
-			if divisor == 0 {
-				L.RaiseError("Division by zero")
+		for j := 1; j <= row1Table.Len(); j++ {
+			value1 := row1Table.RawGetInt(j)
+			value2 := row2Table.RawGetInt(j)
+
+			if value1.Type() != LTNumber || value2.Type() != LTNumber {
+				L.RaiseError("Invalid type in matrices at position [%d][%d]", i, j)
+				return 0
 			}
-			div := LNumber(row1.RawGetInt(j).(LNumber) / divisor)
+
+			divisor := value2.(LNumber)
+			if divisor == 0 {
+				L.RaiseError("Division by zero at position [%d][%d]", i, j)
+				return 0
+			}
+
+			div := LNumber(float64(value1.(LNumber)) / float64(divisor))
 			resultRow.RawSetInt(j, div)
 		}
 		result.RawSetInt(i, resultRow)
@@ -428,14 +558,50 @@ func matrixDot(L *LState) int {
 	matrix1 := L.CheckTable(1)
 	matrix2 := L.CheckTable(2)
 
+	if matrix1 == nil || matrix2 == nil {
+		L.RaiseError("One of the input matrices is nil")
+		return 0
+	}
+
+	if matrix1.Len() == 0 || matrix2.Len() == 0 {
+		L.RaiseError("One of the input matrices is empty")
+		return 0
+	}
+
+	if matrix1.Len() != matrix2.Len() {
+		L.RaiseError("Matrix dimensions do not match")
+		return 0
+	}
+
 	result := LNumber(0)
 
 	for i := 1; i <= matrix1.Len(); i++ {
-		row1 := matrix1.RawGetInt(i).(*LTable)
-		row2 := matrix2.RawGetInt(i).(*LTable)
+		row1 := matrix1.RawGetInt(i)
+		row2 := matrix2.RawGetInt(i)
 
-		for j := 1; j <= row1.Len(); j++ {
-			result += row1.RawGetInt(j).(LNumber) * row2.RawGetInt(j).(LNumber)
+		if row1.Type() != LTTable || row2.Type() != LTTable {
+			L.RaiseError("Invalid type in matrices at row %d", i)
+			return 0
+		}
+
+		row1Table := row1.(*LTable)
+		row2Table := row2.(*LTable)
+
+		if row1Table.Len() != row2Table.Len() {
+			L.RaiseError("Matrix dimensions do not match at row %d", i)
+			return 0
+		}
+
+		for j := 1; j <= row1Table.Len(); j++ {
+			value1 := row1Table.RawGetInt(j)
+			value2 := row2Table.RawGetInt(j)
+
+			if value1.Type() != LTNumber || value2.Type() != LTNumber {
+				L.RaiseError("Invalid type in matrices at position [%d][%d]", i, j)
+				return 0
+			}
+
+			result += value1.(LNumber) * value2.(LNumber)
 		}
 	}
 
@@ -447,8 +613,14 @@ func matrixCross(L *LState) int {
 	vec1 := L.CheckTable(1)
 	vec2 := L.CheckTable(2)
 
+	if vec1 == nil || vec2 == nil {
+		L.RaiseError("One of the input vectors is nil")
+		return 0
+	}
+
 	if vec1.Len() != 3 || vec2.Len() != 3 {
 		L.RaiseError("Cross product is only defined for 3D vectors")
+		return 0
 	}
 
 	result := L.NewTable()
@@ -496,6 +668,17 @@ func matrixTranspose(L *LState) int {
 
 func matrixDet(L *LState) int {
 	matrix := L.CheckTable(1)
+
+	if matrix == nil {
+		L.RaiseError("Input matrix is nil")
+		return 0
+	}
+
+	if matrix.Len() == 0 {
+		L.RaiseError("Input matrix is empty")
+		return 0
+	}
+
 	LU, P := lupDecomposition(L, matrix)
 	det := LNumber(1)
 	n := matrix.Len()
@@ -523,6 +706,17 @@ func countSwaps(P *LTable) int {
 
 func matrixInv(L *LState) int {
 	matrix := L.CheckTable(1)
+
+	if matrix == nil {
+		L.RaiseError("Input matrix is nil")
+		return 0
+	}
+
+	if matrix.Len() == 0 {
+		L.RaiseError("Input matrix is empty")
+		return 0
+	}
+
 	n := matrix.Len()
 
 	// 使用LU分解求逆矩阵
@@ -626,6 +820,7 @@ func lupDecomposition(L *LState, matrix *LTable) (*LTable, *LTable) {
 
 		if maxVal == 0 {
 			L.RaiseError("Matrix is singular")
+			return nil, nil
 		}
 
 		// 交换行
@@ -653,6 +848,17 @@ func lupDecomposition(L *LState, matrix *LTable) (*LTable, *LTable) {
 
 func matrixCofactor(L *LState) int {
 	matrix := L.CheckTable(1)
+
+	if matrix == nil {
+		L.RaiseError("Input matrix is nil")
+		return 0
+	}
+
+	if matrix.Len() == 0 {
+		L.RaiseError("Input matrix is empty")
+		return 0
+	}
+
 	n := matrix.Len()
 
 	cofactor := L.NewTable()
@@ -709,12 +915,12 @@ func matrixScale(L *LState) int {
 			case *LTable:
 				resultRow := L.NewTable()
 				for j := 1; j <= r.Len(); j++ {
-					if value, ok := r.RawGetInt(j).(LNumber); ok {
-						resultRow.RawSetInt(j, LNumber(float64(value)*float64(scalar)))
-					} else {
+					value := r.RawGetInt(j)
+					if value.Type() != LTNumber {
 						L.RaiseError("Unsupported type in matrix at position [%d][%d]", i, j)
 						return 0
 					}
+					resultRow.RawSetInt(j, LNumber(float64(value.(LNumber))*float64(scalar)))
 				}
 				result.RawSetInt(i, resultRow)
 			default:
@@ -734,6 +940,11 @@ func matrixScale(L *LState) int {
 func matrixRandom(L *LState) int {
 	rows := L.CheckInt(1)
 	cols := L.CheckInt(2)
+
+	if rows <= 0 || cols <= 0 {
+		L.RaiseError("Invalid matrix dimensions: rows and columns must be positive integers")
+		return 0
+	}
 
 	// 初始化随机数生成器
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -758,9 +969,34 @@ func matrixRandom(L *LState) int {
 func matrixTrace(L *LState) int {
 	matrix := L.CheckTable(1)
 
+	if matrix == nil {
+		L.RaiseError("Input matrix is nil")
+		return 0
+	}
+
+	if matrix.Len() == 0 {
+		L.RaiseError("Input matrix is empty")
+		return 0
+	}
+
 	trace := LNumber(0)
 	for i := 1; i <= matrix.Len(); i++ {
-		trace += matrix.RawGetInt(i).(*LTable).RawGetInt(i).(LNumber)
+		row := matrix.RawGetInt(i)
+		if row.Type() != LTTable {
+			L.RaiseError("Invalid type in matrix at row %d", i)
+			return 0
+		}
+		rowTable := row.(*LTable)
+		if rowTable.Len() < i {
+			L.RaiseError("Matrix is not square at row %d", i)
+			return 0
+		}
+		value := rowTable.RawGetInt(i)
+		if value.Type() != LTNumber {
+			L.RaiseError("Invalid type in matrix at position [%d][%d]", i, i)
+			return 0
+		}
+		trace += value.(LNumber)
 	}
 
 	L.Push(trace)
@@ -769,7 +1005,29 @@ func matrixTrace(L *LState) int {
 
 func matrixEigenvalues(L *LState) int {
 	matrix := L.CheckTable(1)
+
+	if matrix == nil {
+		L.RaiseError("Input matrix is nil")
+		return 0
+	}
+
+	if matrix.Len() == 0 {
+		L.RaiseError("Input matrix is empty")
+		return 0
+	}
+
 	n := matrix.Len()
+	for i := 1; i <= n; i++ {
+		row := matrix.RawGetInt(i)
+		if row.Type() != LTTable {
+			L.RaiseError("Invalid type in matrix at row %d", i)
+			return 0
+		}
+		if row.(*LTable).Len() != n {
+			L.RaiseError("Matrix is not square at row %d", i)
+			return 0
+		}
+	}
 
 	// 先进行 Hessenberg 变换
 	H := hessenbergReduction(L, matrix)
@@ -809,10 +1067,11 @@ func hessenbergReduction(L *LState, matrix *LTable) *LTable {
 				vector.RawSetInt(i, H.RawGetInt(i).(*LTable).RawGetInt(k+1))
 			}
 		}
-		H := calculateHouseholderMatrix(L, vector)
+		HH := calculateHouseholderMatrix(L, vector)
 
 		// 计算Hessenberg矩阵
-		H = matrixMultiply(L, H, H)
+		H = matrixMultiply(L, HH, H)
+		H = matrixMultiply(L, H, HH)
 	}
 
 	return H
@@ -830,6 +1089,8 @@ func qrDecomposition(L *LState, matrix *LTable) (*LTable, *LTable) {
 		Q.RawGetInt(i).(*LTable).RawSetInt(i, LNumber(1))
 	}
 
+	R := copyMatrix(L, matrix)
+
 	for k := 1; k <= n-1; k++ {
 		// 计算Householder变换矩阵
 		vector := L.NewTable()
@@ -837,17 +1098,17 @@ func qrDecomposition(L *LState, matrix *LTable) (*LTable, *LTable) {
 			if i < k {
 				vector.RawSetInt(i, LNumber(0))
 			} else {
-				vector.RawSetInt(i, matrix.RawGetInt(i).(*LTable).RawGetInt(k))
+				vector.RawSetInt(i, R.RawGetInt(i).(*LTable).RawGetInt(k))
 			}
 		}
 		H := calculateHouseholderMatrix(L, vector)
 
 		// 计算QR分解
-		matrix = matrixMultiply(L, H, matrix)
+		R = matrixMultiply(L, H, R)
 		Q = matrixMultiply(L, Q, H)
 	}
 
-	return Q, matrix
+	return Q, R
 }
 
 func isConverged(matrix *LTable) bool {
@@ -928,12 +1189,21 @@ func matrixMultiply(L *LState, matrix1, matrix2 *LTable) *LTable {
 }
 
 func copyMatrix(L *LState, matrix *LTable) *LTable {
+	if matrix == nil {
+		L.RaiseError("Input matrix is nil")
+		return nil
+	}
+
 	result := L.NewTable()
 	for i := 1; i <= matrix.Len(); i++ {
 		row := matrix.RawGetInt(i).(*LTable)
 		resultRow := L.NewTable()
 		for j := 1; j <= row.Len(); j++ {
-			value := row.RawGetInt(j).(LNumber)
+			value, ok := row.RawGetInt(j).(LNumber)
+			if !ok {
+				L.RaiseError("Invalid type in matrix at position [%d][%d]", i, j)
+				return nil
+			}
 			resultRow.RawSetInt(j, value)
 		}
 		result.RawSetInt(i, resultRow)

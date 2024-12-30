@@ -5,7 +5,7 @@ import (
 	"math"
 	"reflect"
 
-	"MilkLua/ast"
+	"github.com/zmsvDreamLang/Milk/ast"
 )
 
 /* internal constants & structs  {{{ */

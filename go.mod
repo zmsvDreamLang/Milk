@@ -1,4 +1,4 @@
-module MilkLua
+module github.com/zmsvDreamLang/Milk
 
 go 1.23.4
 

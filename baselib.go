@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	regexp "regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -449,8 +450,15 @@ func baseToNumber(L *LState) int {
 	case LNumber:
 		L.Push(lv)
 	case LString:
-		str := strings.Trim(string(lv), " \n\t")
-		if strings.Index(str, ".") > -1 {
+		var str string
+		strsli, _ := extractNumberSubstring(string(lv))
+		if len(strsli) == 0 {
+			L.Push(LNil)
+			return 1
+		} else {
+			str = strings.TrimSpace(strsli[0])
+		}
+		if strings.IndexAny(str, ".eE") > -1 {
 			if v, err := strconv.ParseFloat(str, LNumberBit); err != nil {
 				L.Push(LNil)
 			} else {
@@ -459,6 +467,12 @@ func baseToNumber(L *LState) int {
 		} else {
 			if noBase && strings.HasPrefix(strings.ToLower(str), "0x") {
 				base, str = 16, str[2:] // Hex number
+			} else if noBase && (strings.HasPrefix(strings.ToLower(str), "0b") || strings.HasPrefix(strings.ToLower(str), "0B")) {
+				base, str = 2, str[2:] // Binary number
+			} else if noBase && (strings.HasPrefix(strings.ToLower(str), "0o") || strings.HasPrefix(strings.ToLower(str), "0O")) {
+				base, str = 8, str[2:] // Octal number
+			} else if noBase && (strings.HasPrefix(str, "0t") || strings.HasPrefix(str, "0T")) {
+				base, str = 10, str[2:] // Decimal number
 			}
 			if v, err := strconv.ParseInt(str, base, LNumberBit); err != nil {
 				L.Push(LNil)
@@ -466,10 +480,32 @@ func baseToNumber(L *LState) int {
 				L.Push(LNumber(v))
 			}
 		}
+	case *LBool:
+		if *lv {
+			L.Push(LNumber(1))
+		} else {
+			L.Push(LNumber(0))
+		}
 	default:
 		L.Push(LNil)
 	}
 	return 1
+}
+
+func extractNumberSubstring(str string) ([]string, error) {
+	str = strings.TrimSpace(str)
+	if len(str) == 0 {
+		return []string{}, fmt.Errorf("empty string")
+	}
+
+	// 使用正则表达式匹配有效数字，包括科学计数法
+	re := regexp.MustCompile(`(?i)(-?0x[0-9a-f]+|-?0b[01]+|-?0o[0-7]+|-?[0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)?)`)
+	matches := re.FindStringSubmatch(str)
+	if len(matches) > 0 {
+		return matches[0:1], nil
+	}
+
+	return []string{}, fmt.Errorf("no valid number found")
 }
 
 func baseToString(L *LState) int {

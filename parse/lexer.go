@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"MilkLua/ast"
+	"github.com/zmsvDreamLang/Milk/ast"
 )
 
 const EOF = -1
