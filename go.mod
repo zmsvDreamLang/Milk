@@ -1,6 +1,6 @@
 module github.com/zmsvDreamLang/Milk
 
-go 1.23.4
+go 1.20
 
 require (
 	github.com/chzyer/readline v1.5.1

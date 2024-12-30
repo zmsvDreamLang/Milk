@@ -1,0 +1,67 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天UTC时间00:00运行
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: windows
+            arch: x86
+          - os: windows
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: x86
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'  # 使用最新的稳定版Go
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.os }}
+        GOARCH: ${{ matrix.arch }}
+      run: |
+        go fmt ./...
+        go build -o milk-${{ matrix.os }}-${{ matrix.arch }} ./cmd/milk
+
+    - name: Package for Linux
+      if: matrix.os == 'linux'
+      run: |
+        mkdir -p milk_${{ matrix.arch }}/DEBIAN
+        mkdir -p milk_${{ matrix.arch }}/usr/local/bin
+        cp milk-linux-${{ matrix.arch }} milk_${{ matrix.arch }}/usr/local/bin/milk
+        echo "Package: milk" > milk_${{ matrix.arch }}/DEBIAN/control
+        echo "Version: 0.1.0" >> milk_${{ matrix.arch }}/DEBIAN/control
+        echo "Architecture: ${{ matrix.arch }}" >> milk_${{ matrix.arch }}/DEBIAN/control
+        echo "Maintainer: Your Name <your.email@example.com>" >> milk_${{ matrix.arch }}/DEBIAN/control
+        echo "Description: Milk programming language" >> milk_${{ matrix.arch }}/DEBIAN/control
+        dpkg-deb --build milk_${{ matrix.arch }}
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          milk-${{ matrix.os }}-${{ matrix.arch }}
+          *.deb
+        tag_name: nightly-${{ github.sha }}
+        name: Nightly Build ${{ github.sha }}
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
