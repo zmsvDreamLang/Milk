@@ -41,7 +41,7 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         go fmt ./...
-        go build -o milk-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/milk
+        go build -a -gcflags=all="-l -B" -ldflags="-s -w" -o milk-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/milk
 
     - name: Package for Linux
       if: matrix.os == 'linux'
