@@ -4,7 +4,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -66,7 +65,6 @@ var osFuncs = map[string]LGFunction{
 	"get_home_dir": osGetHomeDir,
 	"get_os":       osGetOs,
 	"get_timezone": osGetTimeZone,
-	"kill":         osKill,
 	"remove":       osRemove,
 	"rename":       osRename,
 	"setenv":       osSetEnv,
@@ -206,35 +204,6 @@ func osGetHomeDir(L *LState) int {
 	}
 	L.Push(LString(dir))
 	return 1
-}
-
-func osKill(L *LState) int {
-	pid := L.CheckInt(1)
-	sig := L.OptString(2, "TERM")
-	signalMap := map[string]syscall.Signal{
-		"HUP":  syscall.SIGHUP,
-		"INT":  syscall.SIGINT,
-		"QUIT": syscall.SIGQUIT,
-		"ILL":  syscall.SIGILL,
-		"TRAP": syscall.SIGTRAP,
-		"ABRT": syscall.SIGABRT,
-		"BUS":  syscall.SIGBUS,
-		"FPE":  syscall.SIGFPE,
-		"KILL": syscall.SIGKILL,
-		"USR1": syscall.SIGUSR1,
-		"SEGV": syscall.SIGSEGV,
-		"USR2": syscall.SIGUSR2,
-		"PIPE": syscall.SIGPIPE,
-		"ALRM": syscall.SIGALRM,
-		"TERM": syscall.SIGTERM,
-	}
-	signal, ok := signalMap[sig]
-	if !ok {
-		L.RaiseError("unknown signal: %s", sig)
-		return 0
-	}
-	syscall.Kill(pid, signal)
-	return 0
 }
 
 func osRemove(L *LState) int {
