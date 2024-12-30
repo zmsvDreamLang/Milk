@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"MilkLua/pm"
+	"github.com/zmsvDreamLang/Milk/pm"
 )
 
 const emptyLString LString = LString("")
