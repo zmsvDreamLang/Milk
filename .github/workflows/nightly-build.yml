@@ -16,12 +16,16 @@ jobs:
         include:
           - os: windows
             arch: amd64
+            ext: .exe
           - os: darwin
             arch: arm64
+            ext: ''
           - os: linux
             arch: amd64
+            ext: ''
           - os: linux
             arch: arm64
+            ext: ''
 
     steps:
     - uses: actions/checkout@v3
@@ -37,7 +41,7 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         go fmt ./...
-        go build -o milk-${{ matrix.os }}-${{ matrix.arch }} ./cmd/milk
+        go build -o milk-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/milk
 
     - name: Package for Linux
       if: matrix.os == 'linux'
@@ -56,7 +60,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          milk-${{ matrix.os }}-${{ matrix.arch }}
+          milk-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
           *.deb
         tag_name: nightly-${{ github.sha }}
         name: Nightly Build ${{ github.sha }}
