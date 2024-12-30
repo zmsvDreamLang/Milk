@@ -45,6 +45,8 @@ const (
 	FFILibName = "ffi"
 	// HttpLibName is the name of the http Library.
 	HttpLibName = "http"
+	// DatabaseLibName is the name of the database Library.
+	DatabaseLibName = "database"
 	// DefaultExportLibName is the name of the default export Library.
 	DefaultExportLibName = "lib"
 )
@@ -77,6 +79,7 @@ var luaLibs = []luaLib{
 	{NeurolibName, OpenNeurolib},
 	{FFILibName, OpenFFI},
 	{HttpLibName, OpenHttp},
+	{DatabaseLibName, OpenDatabase},
 	{DefaultExportLibName, OpenLib},
 }
 
