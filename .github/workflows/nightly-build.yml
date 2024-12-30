@@ -12,8 +12,6 @@ jobs:
       matrix:
         include:
           - os: windows
-            arch: x86
-          - os: windows
             arch: amd64
           - os: darwin
             arch: arm64
