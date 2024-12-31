@@ -30,6 +30,9 @@ func getIntField(_ *LState, tb *LTable, key string, v int) int {
 			}
 		}
 		if num, err := parseNumber(slv); err == nil {
+			if int64(num) > int64(^uint(0)>>1) {
+				return int(^uint(0) >> 1)
+			}
 			return int(num)
 		}
 	default:
