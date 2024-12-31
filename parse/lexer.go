@@ -236,6 +236,9 @@ func (sc *Scanner) scanEscape(ch int, buf *bytes.Buffer) error {
 				bytes = append(bytes, byte(sc.Next()))
 			}
 			val, _ := strconv.ParseInt(string(bytes), 10, 32)
+			if val < 0 || val > 255 {
+				return fmt.Errorf("escape sequence out of range: %d", val)
+			}
 			writeChar(buf, int(val))
 		} else {
 			writeChar(buf, ch)
