@@ -35,6 +35,12 @@ jobs:
       with:
         go-version: '1.21'  # 使用最新的稳定版Go
 
+    - name: Delete existing Nightly releases
+      run: |
+        gh release list --limit 1000 | grep 'nightly-' | cut -f1 | xargs -I {} gh release delete {} -y --cleanup-tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Build
       env:
         GOOS: ${{ matrix.os }}
