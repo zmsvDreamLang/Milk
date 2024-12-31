@@ -29,7 +29,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_dt, "dt", false, "")
 	flag.BoolVar(&opt_dc, "dc", false, "")
 	flag.Usage = func() {
-		fmt.Println(`Usage: glua [options] [script [args]].
+		fmt.Println(`Usage: milk [options] [script [args]].
 Available options are:
   -e stat  execute string 'stat'
   -l name  require library 'name'
@@ -92,6 +92,7 @@ Available options are:
 			}
 			if opt_dt {
 				fmt.Println(parse.Dump(chunk))
+				return 0
 			}
 			if opt_dc {
 				proto, err3 := lua.Compile(chunk, script)
@@ -99,7 +100,9 @@ Available options are:
 					fmt.Println(err3.Error())
 					return 1
 				}
-				fmt.Println(proto.String())
+				fmt.Println(proto.RawBytecodeString())
+				// fmt.Println(proto.String())
+				return 0
 			}
 		}
 		if err := L.DoFile(script); err != nil {
