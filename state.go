@@ -1662,6 +1662,9 @@ func (ls *LState) ToInt(n int) int {
 	}
 	if lv, ok := ls.Get(n).(LString); ok {
 		if num, err := parseNumber(string(lv)); err == nil {
+			if num > math.MaxInt || num < math.MinInt {
+			    return 0
+			}
 			return int(num)
 		}
 	}
