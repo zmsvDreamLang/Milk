@@ -23,6 +23,7 @@ var tableFuncs = map[string]LGFunction{
 	"remove":   tableRemove,
 	"sort":     tableSort,
 	"tostring": tableToString,
+	"unpack":   tableUnpack,
 }
 
 // tableSort sorts the elements of the table in place.
@@ -263,4 +264,17 @@ func Equal(L *LState, a, b LValue) bool {
 		return false
 	}
 	return false
+}
+
+func tableUnpack(L *LState) int {
+	t := L.CheckTable(1)
+	start := L.OptInt(2, 1)
+	end := L.OptInt(3, t.Len())
+	if start > end {
+		return 0
+	}
+	for i := start; i <= end; i++ {
+		L.Push(t.RawGetInt(i))
+	}
+	return end - start + 1
 }
