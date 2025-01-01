@@ -183,3 +183,171 @@ if not success then
 else
     print("数据库连接已关闭")
 end
+
+-- 测试面向对象调用和简单调用
+
+print("\n测试面向对象调用和简单调用:")
+
+-- 重新连接数据库
+local db, err = database.open("mydb", 3306, "username", "password")
+if err then
+    print("重新连接数据库失败:", err)
+    return
+end
+
+-- 测试 query 方法（面向对象调用）
+print("\n测试 query 方法（面向对象调用）:")
+local results = db:query("SELECT * FROM users LIMIT 1")
+if results and #results > 0 then
+    print("查询成功，第一个用户:", results[1].name)
+else
+    print("查询失败或没有数据")
+end
+
+-- 测试 query 方法（简单调用）
+print("\n测试 query 方法（简单调用）:")
+results = database.query(db, "SELECT * FROM users LIMIT 1")
+if results and #results > 0 then
+    print("查询成功，第一个用户:", results[1].name)
+else
+    print("查询失败或没有数据")
+end
+
+-- 测试 exec 方法（面向对象调用）
+print("\n测试 exec 方法（面向对象调用）:")
+local success, result = db:exec("INSERT INTO users (name, age) VALUES ('Bob', 25)")
+if success then
+    print("插入成功，最后插入的ID:", result)
+else
+    print("插入失败:", result)
+end
+
+-- 测试 exec 方法（简单调用）
+print("\n测试 exec 方法（简单调用）:")
+success, result = database.exec(db, "INSERT INTO users (name, age) VALUES ('Charlie', 40)")
+if success then
+    print("插入成功，最后插入的ID:", result)
+else
+    print("插入失败:", result)
+end
+
+-- 测试 createTable 方法（面向对象调用）
+print("\n测试 createTable 方法（面向对象调用）:")
+local columns = {
+    id = "INT AUTO_INCREMENT PRIMARY KEY",
+    title = "VARCHAR(100) UNIQUE",
+    content = "TEXT"
+}
+success = db:createTable("posts", columns)
+if success then
+    print("posts 表创建成功")
+else
+    print("创建 posts 表失败")
+end
+
+-- 测试 createTable 方法（简单调用）
+print("\n测试 createTable 方法（简单调用）:")
+columns = {
+    id = "INT AUTO_INCREMENT PRIMARY KEY",
+    name = "VARCHAR(50) UNIQUE",
+    description = "TEXT"
+}
+success = database.createTable(db, "categories", columns)
+if success then
+    print("categories 表创建成功")
+else
+    print("创建 categories 表失败")
+end
+
+-- 测试 insert 方法（面向对象调用）
+print("\n测试 insert 方法（面向对象调用）:")
+local post_data = {
+    title = "First Post",
+    content = "This is the content of the first post."
+}
+success, last_insert_id = db:insert("posts", post_data)
+if success then
+    print("插入成功，最后插入的ID:", last_insert_id)
+else
+    print("插入失败")
+end
+
+-- 测试 insert 方法（简单调用）
+print("\n测试 insert 方法（简单调用）:")
+local category_data = {
+    name = "Technology",
+    description = "Posts about technology"
+}
+success, last_insert_id = database.insert(db, "categories", category_data)
+if success then
+    print("插入成功，最后插入的ID:", last_insert_id)
+else
+    print("插入失败")
+end
+
+-- 测试 update 方法（面向对象调用）
+print("\n测试 update 方法（面向对象调用）:")
+local update_data = {
+    age = 26
+}
+success, rows_affected = db:update("users", update_data, "name = 'Bob'")
+if success then
+    print("更新成功，受影响的行数:", rows_affected)
+else
+    print("更新失败")
+end
+
+-- 测试 update 方法（简单调用）
+print("\n测试 update 方法（简单调用）:")
+update_data = {
+    age = 41
+}
+success, rows_affected = database.update(db, "users", update_data, "name = 'Charlie'")
+if success then
+    print("更新成功，受影响的行数:", rows_affected)
+else
+    print("更新失败")
+end
+
+-- 测试 delete 方法（面向对象调用）
+print("\n测试 delete 方法（面向对象调用）:")
+success, rows_affected = db:delete("users", "name = 'Bob'")
+if success then
+    print("删除成功，受影响的行数:", rows_affected)
+else
+    print("删除失败")
+end
+
+-- 测试 delete 方法（简单调用）
+print("\n测试 delete 方法（简单调用）:")
+success, rows_affected = database.delete(db, "users", "name = 'Charlie'")
+if success then
+    print("删除成功，受影响的行数:", rows_affected)
+else
+    print("删除失败")
+end
+
+-- 关闭数据库连接（面向对象调用）
+print("\n关闭数据库连接（面向对象调用）:")
+success, err = db:close()
+if not success then
+    print("关闭数据库连接失败:", err)
+else
+    print("数据库连接已关闭")
+end
+
+-- 重新连接数据库以测试简单调用的关闭方法
+db, err = database.open("mydb", 3306, "username", "password")
+if err then
+    print("重新连接数据库失败:", err)
+    return
+end
+
+-- 关闭数据库连接（简单调用）
+print("\n关闭数据库连接（简单调用）:")
+success, err = database.close(db)
+if not success then
+    print("关闭数据库连接失败:", err)
+else
+    print("数据库连接已关闭")
+end

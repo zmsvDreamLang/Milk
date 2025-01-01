@@ -10,21 +10,33 @@ import (
 
 func OpenDatabase(L *LState) int {
 	mod := L.RegisterModule(DatabaseLibName, databaseFuncs)
+
+	mt := L.NewTypeMetatable("database")
+	L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), databaseMethods))
+
 	L.Push(mod)
 	return 1
 }
 
 var databaseFuncs = map[string]LGFunction{
-	"open":         dbOpen,
-	"close":        dbClose,
-	"query":        dbQuery,
-	"exec":         dbExec,
-	"lastInsertId": dbLastInsertId,
-	"rowsAffected": dbRowsAffected,
-	"createTable":  dbCreateTable,
-	"insert":       dbInsert,
-	"update":       dbUpdate,
-	"delete":       dbDelete,
+	"open":        dbOpen,
+	"close":       dbClose,
+	"query":       dbQuery,
+	"exec":        dbExec,
+	"createTable": dbCreateTable,
+	"insert":      dbInsert,
+	"update":      dbUpdate,
+	"delete":      dbDelete,
+}
+
+var databaseMethods = map[string]LGFunction{
+	"close":       dbClose,
+	"query":       dbQuery,
+	"exec":        dbExec,
+	"createTable": dbCreateTable,
+	"insert":      dbInsert,
+	"update":      dbUpdate,
+	"delete":      dbDelete,
 }
 
 func dbOpen(L *LState) int {
@@ -58,8 +70,7 @@ func openDatabaseConnection(dbname string, port int, usr, pwd string) (*sql.DB, 
 }
 
 func dbClose(L *LState) int {
-	ud := L.CheckUserData(1)
-	db := ud.Value.(*sql.DB)
+	db := getDatabase(L, 1)
 	if err := db.Close(); err != nil {
 		L.Push(LBool(false))
 		L.Push(LString(fmt.Sprintf("Failed to close database: %v", err)))
@@ -70,9 +81,8 @@ func dbClose(L *LState) int {
 }
 
 func dbQuery(L *LState) int {
-	ud := L.CheckUserData(1)
-	db := ud.Value.(*sql.DB)
-	query := L.CheckString(2)
+	db := getDatabase(L, 1)
+	query := L.CheckString(L.GetTop())
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -119,21 +129,13 @@ func dbQuery(L *LState) int {
 }
 
 func dbExec(L *LState) int {
-	ud := L.CheckUserData(1)
-	db := ud.Value.(*sql.DB)
-	query := L.CheckString(2)
+	db := getDatabase(L, 1)
+	query := L.CheckString(L.GetTop())
 
 	res, err := db.Exec(query)
 	if err != nil {
-		L.Push(LNil)
+		L.Push(LBool(false))
 		L.Push(LString(fmt.Sprintf("SQL Error: %v", err)))
-		return 2
-	}
-
-	_, err = res.LastInsertId()
-	if err != nil {
-		L.Push(LNil)
-		L.Push(LString(fmt.Sprintf("Failed to get last insert ID: %v", err)))
 		return 2
 	}
 
@@ -143,55 +145,10 @@ func dbExec(L *LState) int {
 	return 2
 }
 
-func dbLastInsertId(L *LState) int {
-	ud := L.CheckUserData(1)
-	res, ok := ud.Value.(sql.Result)
-	if !ok {
-		L.Push(LNil)
-		L.Push(LString("Invalid result type"))
-		return 2
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		L.Push(LNil)
-		L.Push(LString(fmt.Sprintf("Failed to get last insert ID: %v", err)))
-		return 2
-	}
-	L.Push(LNumber(id))
-	return 1
-}
-
-func dbRowsAffected(L *LState) int {
-	ud := L.CheckUserData(1)
-	res, ok := ud.Value.(sql.Result)
-	if !ok {
-		L.Push(LNil)
-		L.Push(LString("Invalid result type"))
-		return 2
-	}
-	ra, err := res.RowsAffected()
-	if err != nil {
-		L.Push(LNil)
-		L.Push(LString(fmt.Sprintf("Failed to get rows affected: %v", err)))
-		return 2
-	}
-	L.Push(LNumber(ra))
-	return 1
-}
-
-func checkDatabase(L *LState, n int) *sql.DB {
-	ud := L.CheckUserData(n)
-	if v, ok := ud.Value.(*sql.DB); ok {
-		return v
-	}
-	L.ArgError(n, "database expected")
-	return nil
-}
-
 func dbCreateTable(L *LState) int {
-	db := checkDatabase(L, 1)
-	tableName := L.CheckString(2)
-	columns := L.CheckTable(3)
+	db := getDatabase(L, 1)
+	tableName := L.CheckString(L.GetTop() - 1)
+	columns := L.CheckTable(L.GetTop())
 
 	var columnDefs []string
 	columns.ForEach(func(k, v LValue) {
@@ -215,9 +172,9 @@ func dbCreateTable(L *LState) int {
 }
 
 func dbInsert(L *LState) int {
-	db := checkDatabase(L, 1)
-	tableName := L.CheckString(2)
-	data := L.CheckTable(3)
+	db := getDatabase(L, 1)
+	tableName := L.CheckString(L.GetTop() - 1)
+	data := L.CheckTable(L.GetTop())
 
 	var columns []string
 	var placeholders []string
@@ -246,10 +203,10 @@ func dbInsert(L *LState) int {
 }
 
 func dbUpdate(L *LState) int {
-	db := checkDatabase(L, 1)
-	tableName := L.CheckString(2)
-	data := L.CheckTable(3)
-	condition := L.CheckString(4)
+	db := getDatabase(L, 1)
+	tableName := L.CheckString(L.GetTop() - 2)
+	data := L.CheckTable(L.GetTop() - 1)
+	condition := L.CheckString(L.GetTop())
 
 	var setStatements []string
 	var values []interface{}
@@ -276,9 +233,9 @@ func dbUpdate(L *LState) int {
 }
 
 func dbDelete(L *LState) int {
-	db := checkDatabase(L, 1)
-	tableName := L.CheckString(2)
-	condition := L.CheckString(3)
+	db := getDatabase(L, 1)
+	tableName := L.CheckString(L.GetTop() - 1)
+	condition := L.CheckString(L.GetTop())
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE %s", tableName, condition)
 	result, err := db.Exec(query)
@@ -292,6 +249,25 @@ func dbDelete(L *LState) int {
 	L.Push(LBool(true))
 	L.Push(LNumber(rowsAffected))
 	return 2
+}
+
+func getDatabase(L *LState, index int) *sql.DB {
+	if ud, ok := L.Get(index).(*LUserData); ok {
+		if db, ok := ud.Value.(*sql.DB); ok {
+			L.Remove(index) // 移除self参数
+			return db
+		}
+	}
+	return checkDatabase(L, index)
+}
+
+func checkDatabase(L *LState, n int) *sql.DB {
+	ud := L.CheckUserData(n)
+	if v, ok := ud.Value.(*sql.DB); ok {
+		return v
+	}
+	L.ArgError(n, "database expected")
+	return nil
 }
 
 func luaValueToInterface(v LValue) interface{} {
