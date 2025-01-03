@@ -6,6 +6,7 @@ import (
 
 func OpenCalculus(L *LState) int {
 	mod := L.RegisterModule(CalculusLibName, calculusFuncs)
+
 	L.Push(mod)
 	return 1
 }
@@ -13,6 +14,14 @@ func OpenCalculus(L *LState) int {
 var calculusFuncs = map[string]LGFunction{
 	"derivative": calculusDerivative,
 	"integral":   calculusIntegral,
+	"autodiff":   calculusAutoDiff,
+
+	"Dual": newDual,
+	"sin":  dualSin,
+	"cos":  dualCos,
+	"exp":  dualExp,
+	"log":  dualLog,
+	"pow":  dualPow,
 }
 
 func calculusDerivative(L *LState) int {
@@ -112,4 +121,137 @@ func adaptiveSimpson(f func(float64) float64, a, b float64, maxDepth int, epsilo
 
 	fa, fb := f(a), f(b)
 	return asr(a, b, fa, fb, 0)
+}
+
+type Dual struct {
+	Value, Derivative float64
+}
+
+func newDual(L *LState) int {
+	value := float64(L.CheckNumber(1))
+	derivative := float64(L.OptNumber(2, 1))
+	ud := L.NewUserData()
+	ud.Value = Dual{Value: value, Derivative: derivative}
+	L.Push(ud)
+	return 1
+}
+
+func getDual(L *LState, index int) Dual {
+	ud := L.CheckUserData(index)
+	return ud.Value.(Dual)
+}
+
+func pushDual(L *LState, d Dual) {
+	ud := L.NewUserData()
+	ud.Value = d
+	L.Push(ud)
+}
+
+func dualSin(L *LState) int {
+	d := getDual(L, 1)
+	result := Sin(d)
+	pushDual(L, result)
+	return 1
+}
+
+func dualCos(L *LState) int {
+	d := getDual(L, 1)
+	result := Cos(d)
+	pushDual(L, result)
+	return 1
+}
+
+func dualExp(L *LState) int {
+	d := getDual(L, 1)
+	result := Exp(d)
+	pushDual(L, result)
+	return 1
+}
+
+func dualLog(L *LState) int {
+	d := getDual(L, 1)
+	result := Log(d)
+	pushDual(L, result)
+	return 1
+}
+
+func dualPow(L *LState) int {
+	d := getDual(L, 1)
+	n := L.CheckNumber(2)
+	result := Pow(d, float64(n))
+	pushDual(L, result)
+	return 1
+}
+
+func calculusAutoDiff(L *LState) int {
+	fun := L.CheckFunction(1)
+	x := L.CheckNumber(2)
+	ud := L.NewUserData()
+	ud.Value = Dual{Value: float64(x), Derivative: 1}
+
+	L.Push(fun)
+	L.Push(ud)
+	L.Call(1, 1)
+
+	result := getDual(L, -1)
+	L.Push(LNumber(result.Value))
+	L.Push(LNumber(result.Derivative))
+	return 2
+}
+
+func autoDiff(f func(Dual) Dual, x float64) Dual {
+	return f(Dual{Value: x, Derivative: 1})
+}
+
+// 基本运算
+func (d Dual) Add(other Dual) Dual {
+	return Dual{d.Value + other.Value, d.Derivative + other.Derivative}
+}
+
+func (d Dual) Mul(other Dual) Dual {
+	return Dual{
+		d.Value * other.Value,
+		d.Value*other.Derivative + d.Derivative*other.Value,
+	}
+}
+
+func (d Dual) Div(other Dual) Dual {
+	return Dual{
+		d.Value / other.Value,
+		(d.Derivative*other.Value - d.Value*other.Derivative) / (other.Value * other.Value),
+	}
+}
+
+// 初等函数
+func Sin(d Dual) Dual {
+	return Dual{
+		math.Sin(d.Value),
+		d.Derivative * math.Cos(d.Value),
+	}
+}
+
+func Cos(d Dual) Dual {
+	return Dual{
+		math.Cos(d.Value),
+		-d.Derivative * math.Sin(d.Value),
+	}
+}
+
+func Exp(d Dual) Dual {
+	ex := math.Exp(d.Value)
+	return Dual{ex, d.Derivative * ex}
+}
+
+func Log(d Dual) Dual {
+	return Dual{
+		math.Log(d.Value),
+		d.Derivative / d.Value,
+	}
+}
+
+func Pow(d Dual, n float64) Dual {
+	return Dual{
+		math.Pow(d.Value, n),
+		n * math.Pow(d.Value, n-1) * d.Derivative,
+	}
 }
